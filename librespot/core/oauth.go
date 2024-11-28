@@ -7,6 +7,8 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+
+        "github.com/toqueteos/webbrowser"
 )
 
 type OAuth struct {
@@ -53,13 +55,15 @@ func GetOauthAccessToken(code string, redirectUri string, clientId string, clien
 func getOAuthToken(clientId string, clientSecret string) OAuth {
 	ch := make(chan OAuth)
 
-	fmt.Println("go to this url")
 	urlPath := "https://accounts.spotify.com/authorize?" +
 		"client_id=" + clientId +
 		"&response_type=code" +
 		"&redirect_uri=http://localhost:8888/callback" +
 		"&scope=streaming"
-	fmt.Println(urlPath)
+
+	//fmt.Println("go to this url")
+	//fmt.Println(urlPath)
+        webbrowser.Open(urlPath)
 
 	http.HandleFunc("/callback", func(w http.ResponseWriter, r *http.Request) {
 		params := r.URL.Query()
