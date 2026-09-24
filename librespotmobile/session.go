@@ -21,8 +21,8 @@ func Login(username string, password string, deviceName string) (*MobileSession,
 	return initSessionImpl(sess)
 }
 
-func LoginSaved(username string, authData []byte, deviceName string) (*MobileSession, error) {
-	sess, err := core.LoginSaved(username, authData, deviceName)
+func LoginSaved(username string, authData []byte, deviceName string, clientId string, clientSecret string) (*MobileSession, error) {
+	sess, err := core.LoginSaved(username, authData, deviceName, clientId, clientSecret)
 
 	if err != nil {
 		return nil, err
@@ -49,6 +49,10 @@ func (s *MobileSession) DeviceId() string {
 
 func (s *MobileSession) ReusableAuthBlob() []byte {
 	return s.session.ReusableAuthBlob()
+}
+
+func (s *MobileSession) AuthDataBlob() []byte {
+	return s.session.AuthDataBlob()
 }
 
 func (s *MobileSession) Country() string {

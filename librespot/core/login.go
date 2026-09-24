@@ -37,8 +37,12 @@ func (s *Session) loginSession(username string, password string, deviceName stri
 	return s.doLogin(loginPacket, username)
 }
 
-// Login to Spotify using an existing authData blob
-func LoginSaved(username string, authData []byte, deviceName string) (*Session, error) {
+// Login to Spotify using an existing authData blob, as previously saved via Session.AuthDataBlob(). If the blob
+// carries an OAuth refresh token and clientId/clientSecret are non-empty, it's redeemed for a fresh Web API access
+// token (see Session.AccessToken), so features like Search work without requiring a fresh interactive login.
+func LoginSaved(username string, authData []byte, deviceName string, clientId string, clientSecret string) (*Session, error) {
+	ad := unmarshalAuthData(authData)
+
 	s, err := setupSession()
 	if err != nil {
 		return s, err
@@ -51,9 +55,26 @@ func LoginSaved(username string, authData []byte, deviceName string) (*Session, 
 		return s, err
 	}
 
-	packet := makeLoginBlobPacket(username, authData,
+	packet := makeLoginBlobPacket(username, ad.Blob,
 		Spotify.AuthenticationType_AUTHENTICATION_STORED_SPOTIFY_CREDENTIALS.Enum(), s.deviceId)
-	return s, s.doLogin(packet, username)
+	if err := s.doLogin(packet, username); err != nil {
+		return s, err
+	}
+
+	s.refreshToken = ad.RefreshToken
+	if ad.RefreshToken != "" && clientId != "" && clientSecret != "" {
+		token, err := RefreshOAuthToken(ad.RefreshToken, clientId, clientSecret)
+		if err != nil {
+			log.Println("could not refresh OAuth token, Web API calls (e.g. Search) will be unavailable:", err)
+		} else {
+			s.accessToken = token.AccessToken
+			if token.RefreshToken != "" {
+				s.refreshToken = token.RefreshToken
+			}
+		}
+	}
+
+	return s, nil
 }
 
 // Registers librespot as a Spotify Connect device via mdns. When user connects, logs on to Spotify and saves
@@ -87,7 +108,14 @@ func LoginDiscoveryBlobFile(cacheBlobPath, deviceName string) (*Session, error) 
 // Login to Spotify using the OAuth method
 func LoginOAuth(deviceName string, clientId string, clientSecret string) (*Session, error) {
 	token := getOAuthToken(clientId, clientSecret)
-	return loginOAuthToken(token.AccessToken, deviceName)
+	s, err := loginOAuthToken(token.AccessToken, deviceName)
+	if err != nil {
+		return s, err
+	}
+
+	s.accessToken = token.AccessToken
+	s.refreshToken = token.RefreshToken
+	return s, nil
 }
 
 func loginOAuthToken(accessToken string, deviceName string) (*Session, error) {

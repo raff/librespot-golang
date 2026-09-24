@@ -52,6 +52,12 @@ type Session struct {
 	reusableAuthBlob []byte
 	// country is the user country returned by the Spotify servers
 	country string
+	// accessToken is an OAuth Web API bearer token (obtained via LoginOAuth, or by
+	// redeeming refreshToken), used for calls to Spotify's official Web API (search).
+	accessToken string
+	// refreshToken is the OAuth refresh token used to mint a fresh accessToken on
+	// future runs without requiring an interactive browser login again.
+	refreshToken string
 }
 
 func (s *Session) Stream() connection.PacketStream {
@@ -80,6 +86,27 @@ func (s *Session) DeviceId() string {
 
 func (s *Session) ReusableAuthBlob() []byte {
 	return s.reusableAuthBlob
+}
+
+// AuthDataBlob returns the combined, persistable authentication state (the
+// reusable Connect blob plus, when available, the OAuth refresh token) that
+// should be written to the blob file so future runs can both reconnect and
+// use the Web API (e.g. Search) without an interactive login.
+func (s *Session) AuthDataBlob() []byte {
+	return marshalAuthData(s.reusableAuthBlob, s.refreshToken)
+}
+
+// AccessToken returns the current OAuth Web API bearer token, or "" if none
+// is available (e.g. the session was logged in with username/password and no
+// refresh token has ever been obtained).
+func (s *Session) AccessToken() string {
+	return s.accessToken
+}
+
+// RefreshToken returns the OAuth refresh token associated with this session,
+// or "" if none is available.
+func (s *Session) RefreshToken() string {
+	return s.refreshToken
 }
 
 func (s *Session) Country() string {

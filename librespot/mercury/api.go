@@ -17,6 +17,9 @@ func (m *Client) mercuryGet(url string) []byte {
 		Uri:     url,
 		Payload: [][]byte{},
 	}, func(res Response) {
+		if res.StatusCode != 200 {
+			fmt.Printf("mercuryGet: %s -> status %d, body [%s]\n", url, res.StatusCode, res.CombinePayload())
+		}
 		done <- res.CombinePayload()
 	})
 
@@ -26,7 +29,7 @@ func (m *Client) mercuryGet(url string) []byte {
 
 func (m *Client) mercuryGetJson(url string, result interface{}) (err error) {
 	data := m.mercuryGet(url)
-	// fmt.Printf("%s", data)
+	// fmt.Printf("mercuryGetJson: [%s]\n", data)
 	err = json.Unmarshal(data, result)
 	return
 }

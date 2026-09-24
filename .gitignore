@@ -4,6 +4,7 @@ vendor/
 .idea/
 pkg/
 blob.bin
+.env
 *.aar
 *.jar
 bin/

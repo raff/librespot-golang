@@ -9,9 +9,10 @@ func Login(username string, password string, deviceName string) (*core.Session, 
 	return core.Login(username, password, deviceName)
 }
 
-// Login to Spotify using an existing authData blob
-func LoginSaved(username string, authData []byte, deviceName string) (*core.Session, error) {
-	return core.LoginSaved(username, authData, deviceName)
+// Login to Spotify using an existing authData blob (see Session.AuthDataBlob). clientId/clientSecret, when
+// non-empty, are used to redeem a stored OAuth refresh token for a fresh Web API access token (needed for Search).
+func LoginSaved(username string, authData []byte, deviceName string, clientId string, clientSecret string) (*core.Session, error) {
+	return core.LoginSaved(username, authData, deviceName, clientId, clientSecret)
 }
 
 // Registers librespot as a Spotify Connect device via mdns. When user connects, logs on to Spotify and saves

@@ -47,28 +47,30 @@ func main() {
 	var session *core.Session
 	var err error
 
-	if *username != "" && *password != "" {
-		// Authenticate using a regular login and password, and store it in the blob file.
-		session, err = librespot.Login(*username, *password, *devicename)
+	// clientId/clientSecret identify a Spotify developer app (see https://developer.spotify.com/dashboard).
+	// They're required to mint OAuth Web API tokens (used by e.g. Search), whether via a fresh interactive
+	// OAuth login or by redeeming a refresh token saved from a previous one.
+	clientId := os.Getenv("client_id")
+	clientSecret := os.Getenv("client_secret")
 
-		err := ioutil.WriteFile(*blob, session.ReusableAuthBlob(), 0600)
-		if err != nil {
-			fmt.Printf("Could not store authentication blob in blob.bin: %s\n", err)
-		}
+	if *username != "" && *password != "" {
+		// Authenticate using a regular login and password. Note this doesn't yield an OAuth token, so
+		// features that need the Web API (e.g. Search) won't be available until an OAuth login is done.
+		session, err = librespot.Login(*username, *password, *devicename)
 	} else if *blob != "" && *username != "" {
 		// Authenticate reusing an existing blob
-		blobBytes, err := ioutil.ReadFile(*blob)
+		blobBytes, readErr := ioutil.ReadFile(*blob)
 
-		if err != nil {
-			fmt.Printf("Unable to read auth blob from %s: %s\n", *blob, err)
+		if readErr != nil {
+			fmt.Printf("Unable to read auth blob from %s: %s\n", *blob, readErr)
 			os.Exit(1)
 			return
 		}
 
-		session, err = librespot.LoginSaved(*username, blobBytes, *devicename)
-	} else if os.Getenv("client_secret") != "" {
-		// Authenticate using OAuth (untested)
-		session, err = librespot.LoginOAuth(*devicename, os.Getenv("client_id"), os.Getenv("client_secret"))
+		session, err = librespot.LoginSaved(*username, blobBytes, *devicename, clientId, clientSecret)
+	} else if clientSecret != "" {
+		// Authenticate using OAuth
+		session, err = librespot.LoginOAuth(*devicename, clientId, clientSecret)
 	} else {
 		// No valid options, show the helo
 		fmt.Println("need to supply a username and password or a blob file path")
@@ -84,11 +86,20 @@ func main() {
 		return
 	}
 
+	if *blob != "" {
+		// Persist the reconnection blob and (if any) OAuth refresh token, so future runs can reconnect
+		// and use the Web API (e.g. Search) without an interactive login.
+		if err := ioutil.WriteFile(*blob, session.AuthDataBlob(), 0600); err != nil {
+			fmt.Printf("Could not store authentication blob in %s: %s\n", *blob, err)
+		}
+	}
+
 	// Command loop
 	reader := bufio.NewReader(os.Stdin)
 
 	printHelp()
 
+loop:
 	for {
 		fmt.Print("> ")
 		text, _ := reader.ReadString('\n')
@@ -97,6 +108,10 @@ func main() {
 		switch cmds[0] {
 		case "help":
 			printHelp()
+
+		case "exit", "quit":
+			fmt.Println("goodbye!")
+			break loop
 
 		case "track":
 			if len(cmds) < 2 {
@@ -252,7 +267,7 @@ func funcPlaylists(session *core.Session) {
 }
 
 func funcSearch(session *core.Session, keyword string) {
-	resp, err := session.Mercury().Search(keyword, 12, session.Country(), session.Username())
+	resp, err := session.Search(keyword, 12)
 
 	if err != nil {
 		fmt.Println("Failed to search:", err)
