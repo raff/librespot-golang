@@ -61,7 +61,13 @@ func LoginSaved(username string, authData []byte, deviceName string, clientId st
 		return s, err
 	}
 
+	// explicit credentials override the ones stored in the blob file
+	if clientId == "" || clientSecret == "" {
+		clientId, clientSecret = ad.ClientID, ad.ClientSecret
+	}
+
 	s.refreshToken = ad.RefreshToken
+	s.clientId, s.clientSecret = clientId, clientSecret
 	if ad.RefreshToken != "" && clientId != "" && clientSecret != "" {
 		token, err := RefreshOAuthToken(ad.RefreshToken, clientId, clientSecret)
 		if err != nil {
@@ -115,6 +121,7 @@ func LoginOAuth(deviceName string, clientId string, clientSecret string) (*Sessi
 
 	s.accessToken = token.AccessToken
 	s.refreshToken = token.RefreshToken
+	s.clientId, s.clientSecret = clientId, clientSecret
 	return s, nil
 }
 

@@ -10,10 +10,15 @@ import "encoding/json"
 type AuthData struct {
 	Blob         []byte `json:"blob"`
 	RefreshToken string `json:"refresh_token,omitempty"`
+
+	// OAuth application credentials needed to redeem RefreshToken, so that
+	// callers don't have to supply them again on every launch.
+	ClientID     string `json:"client_id,omitempty"`
+	ClientSecret string `json:"client_secret,omitempty"`
 }
 
-func marshalAuthData(blob []byte, refreshToken string) []byte {
-	data, _ := json.Marshal(AuthData{Blob: blob, RefreshToken: refreshToken})
+func marshalAuthData(blob []byte, refreshToken, clientId, clientSecret string) []byte {
+	data, _ := json.Marshal(AuthData{Blob: blob, RefreshToken: refreshToken, ClientID: clientId, ClientSecret: clientSecret})
 	return data
 }
 

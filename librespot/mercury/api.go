@@ -66,23 +66,6 @@ func (m *Client) GetToken(clientId string, scopes string) (*metadata.Token, erro
 	return token, err
 }
 
-func (m *Client) Search(search string, limit int, country string, username string) (*metadata.SearchResponse, error) {
-	v := url.Values{}
-	v.Set("entityVersion", "2")
-	v.Set("limit", fmt.Sprintf("%d", limit))
-	v.Set("imageSize", "large")
-	v.Set("catalogue", "")
-	v.Set("country", country)
-	v.Set("platform", "zelda")
-	v.Set("username", username)
-
-	uri := fmt.Sprintf("hm://searchview/km/v4/search/%s?%s", url.QueryEscape(search), v.Encode())
-
-	result := &metadata.SearchResponse{}
-	err := m.mercuryGetJson(uri, result)
-	return result, err
-}
-
 func (m *Client) Suggest(search string) (*metadata.SuggestResult, error) {
 	uri := "hm://searchview/km/v3/suggest/" + url.QueryEscape(search) + "?limit=3&intent=2516516747764520149&sequence=0&catalogue=&country=&locale=&platform=zelda&username="
 	data := m.mercuryGet(uri)

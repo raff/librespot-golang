@@ -58,6 +58,10 @@ type Session struct {
 	// refreshToken is the OAuth refresh token used to mint a fresh accessToken on
 	// future runs without requiring an interactive browser login again.
 	refreshToken string
+	// clientId/clientSecret are the OAuth application credentials used with refreshToken;
+	// they are persisted in AuthDataBlob so they don't need to be supplied again.
+	clientId     string
+	clientSecret string
 }
 
 func (s *Session) Stream() connection.PacketStream {
@@ -93,7 +97,7 @@ func (s *Session) ReusableAuthBlob() []byte {
 // should be written to the blob file so future runs can both reconnect and
 // use the Web API (e.g. Search) without an interactive login.
 func (s *Session) AuthDataBlob() []byte {
-	return marshalAuthData(s.reusableAuthBlob, s.refreshToken)
+	return marshalAuthData(s.reusableAuthBlob, s.refreshToken, s.clientId, s.clientSecret)
 }
 
 // AccessToken returns the current OAuth Web API bearer token, or "" if none
