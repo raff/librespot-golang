@@ -8,6 +8,7 @@ import "encoding/json"
 // that can be redeemed for a Web API access token (needed for e.g. search,
 // since Spotify has retired the old Mercury search endpoints).
 type AuthData struct {
+	Username     string `json:"username,omitempty"`
 	Blob         []byte `json:"blob"`
 	RefreshToken string `json:"refresh_token,omitempty"`
 
@@ -15,10 +16,15 @@ type AuthData struct {
 	// callers don't have to supply them again on every launch.
 	ClientID     string `json:"client_id,omitempty"`
 	ClientSecret string `json:"client_secret,omitempty"`
+
+	// Credentials of the application used for Web API search (client credentials flow), when the
+	// login was done with the official client id (see LoginOAuthPKCE).
+	SearchClientID     string `json:"search_client_id,omitempty"`
+	SearchClientSecret string `json:"search_client_secret,omitempty"`
 }
 
-func marshalAuthData(blob []byte, refreshToken, clientId, clientSecret string) []byte {
-	data, _ := json.Marshal(AuthData{Blob: blob, RefreshToken: refreshToken, ClientID: clientId, ClientSecret: clientSecret})
+func marshalAuthData(ad AuthData) []byte {
+	data, _ := json.Marshal(ad)
 	return data
 }
 
@@ -32,4 +38,11 @@ func unmarshalAuthData(data []byte) AuthData {
 		return AuthData{Blob: data}
 	}
 	return ad
+}
+
+// SearchCredentials returns the search client id/secret stored in an auth data blob (see Session.AuthDataBlob),
+// or empty strings if there are none.
+func SearchCredentials(authData []byte) (clientId string, clientSecret string) {
+	ad := unmarshalAuthData(authData)
+	return ad.SearchClientID, ad.SearchClientSecret
 }

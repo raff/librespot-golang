@@ -181,6 +181,12 @@ message AudioFile {
         AAC_320 = 0xb;
         MP4_128 = 0xc;
         OTHER5 = 0xd;
+        // lossless / xHE-AAC
+        FLAC_FLAC = 0x10;
+        XHE_AAC_12 = 0x12;
+        XHE_AAC_16 = 0x13;
+        XHE_AAC_24 = 0x14;
+        FLAC_FLAC_24BIT = 0x16;
     }
 }
 

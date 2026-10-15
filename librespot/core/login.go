@@ -42,6 +42,12 @@ func (s *Session) loginSession(username string, password string, deviceName stri
 // token (see Session.AccessToken), so features like Search work without requiring a fresh interactive login.
 func LoginSaved(username string, authData []byte, deviceName string, clientId string, clientSecret string) (*Session, error) {
 	ad := unmarshalAuthData(authData)
+	if username == "" {
+		username = ad.Username
+	}
+	if username == "" {
+		return nil, fmt.Errorf("no username supplied and none stored in the auth data")
+	}
 
 	s, err := setupSession()
 	if err != nil {
@@ -61,15 +67,48 @@ func LoginSaved(username string, authData []byte, deviceName string, clientId st
 		return s, err
 	}
 
-	// explicit credentials override the ones stored in the blob file
-	if clientId == "" || clientSecret == "" {
-		clientId, clientSecret = ad.ClientID, ad.ClientSecret
+	pkce := ad.ClientID == PKCEClientId
+	s.refreshToken = ad.RefreshToken
+	s.clientId, s.clientSecret = ad.ClientID, ad.ClientSecret
+	s.searchClientId, s.searchClientSecret = ad.SearchClientID, ad.SearchClientSecret
+
+	if clientId != "" && clientSecret != "" {
+		if pkce {
+			// With a PKCE login the refresh token belongs to the shared official client id, whose Web API quota is
+			// usually exhausted (search fails with 429): explicit credentials are the application used for search.
+			s.searchClientId, s.searchClientSecret = clientId, clientSecret
+		} else {
+			// explicit credentials override the ones stored in the blob file
+			s.clientId, s.clientSecret = clientId, clientSecret
+		}
 	}
 
-	s.refreshToken = ad.RefreshToken
-	s.clientId, s.clientSecret = clientId, clientSecret
-	if ad.RefreshToken != "" && clientId != "" && clientSecret != "" {
-		token, err := RefreshOAuthToken(ad.RefreshToken, clientId, clientSecret)
+	if pkce && s.searchClientId != "" && s.searchClientSecret != "" {
+		// app token (client credentials flow) for catalog calls such as Search
+		token, err := clientCredentialsToken(s.searchClientId, s.searchClientSecret)
+		if err != nil && (s.searchClientId != ad.SearchClientID || s.searchClientSecret != ad.SearchClientSecret) {
+			// the credentials just supplied are invalid: don't replace the stored ones
+			log.Println("WARNING: the client id/secret supplied are not valid (", err, ") - ignored")
+			s.searchClientId, s.searchClientSecret = ad.SearchClientID, ad.SearchClientSecret
+			if s.searchClientId != "" && s.searchClientSecret != "" {
+				token, err = clientCredentialsToken(s.searchClientId, s.searchClientSecret)
+			} else {
+				token, err = nil, nil
+			}
+		}
+
+		if err != nil {
+			log.Println("WARNING: the saved client id/secret for search are not valid (", err, ") - search will use the "+
+				"shared client id and is likely to fail with 429. Run gospy --login --client-id ID --client-secret SECRET to fix it.")
+		} else if token != nil {
+			s.accessToken = token.AccessToken
+			s.searchAppToken = true
+		}
+	}
+
+	if s.accessToken == "" && ad.RefreshToken != "" && s.clientId != "" && (s.clientSecret != "" || pkce) {
+		// a PKCE login (official client id) doesn't need a client secret
+		token, err := RefreshOAuthToken(ad.RefreshToken, s.clientId, s.clientSecret)
 		if err != nil {
 			log.Println("could not refresh OAuth token, Web API calls (e.g. Search) will be unavailable:", err)
 		} else {
@@ -122,6 +161,46 @@ func LoginOAuth(deviceName string, clientId string, clientSecret string) (*Sessi
 	s.accessToken = token.AccessToken
 	s.refreshToken = token.RefreshToken
 	s.clientId, s.clientSecret = clientId, clientSecret
+	return s, nil
+}
+
+// LoginOAuthPKCE logs in through the browser using the official Spotify client id (OAuth authorization code flow
+// with PKCE, no client secret needed). The credentials obtained this way can be used with login5 (see
+// Session.SpclientToken). Save Session.AuthDataBlob() and use LoginSaved to log in again without the browser.
+//
+// searchClientId/searchClientSecret are optional: the credentials of your own Spotify application, used (and saved
+// in AuthDataBlob) to search through the Web API, since the shared official client id is heavily rate limited.
+func LoginOAuthPKCE(deviceName string, searchClientId string, searchClientSecret string) (*Session, error) {
+	// check the search credentials first, so a typo doesn't go unnoticed (or cost a browser login)
+	var searchToken *OAuth
+	if searchClientId != "" && searchClientSecret != "" {
+		var err error
+		searchToken, err = clientCredentialsToken(searchClientId, searchClientSecret)
+		if err != nil {
+			return nil, fmt.Errorf("invalid client id/secret (%v)", err)
+		}
+	}
+
+	token, err := getPKCEOAuthToken()
+	if err != nil {
+		return nil, err
+	}
+
+	s, err := loginOAuthToken(token.AccessToken, deviceName)
+	if err != nil {
+		return s, err
+	}
+
+	s.accessToken = token.AccessToken
+	s.refreshToken = token.RefreshToken
+	s.clientId = PKCEClientId
+
+	if searchToken != nil {
+		s.searchClientId, s.searchClientSecret = searchClientId, searchClientSecret
+		s.accessToken = searchToken.AccessToken
+		s.searchAppToken = true
+	}
+
 	return s, nil
 }
 

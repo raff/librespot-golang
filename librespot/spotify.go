@@ -34,6 +34,16 @@ func LoginDiscoveryBlobFile(cacheBlobPath string, deviceName string) (*core.Sess
 	return core.LoginDiscoveryBlobFile(cacheBlobPath, deviceName)
 }
 
+// Login to Spotify through the browser, using the official Spotify client id (OAuth with PKCE)
+func LoginOAuthPKCE(deviceName string, searchClientId string, searchClientSecret string) (*core.Session, error) {
+	return core.LoginOAuthPKCE(deviceName, searchClientId, searchClientSecret)
+}
+
+// SearchCredentials returns the search client id/secret stored in an auth data blob, if any
+func SearchCredentials(authData []byte) (string, string) {
+	return core.SearchCredentials(authData)
+}
+
 // Login to Spotify using the OAuth method
 func LoginOAuth(deviceName string, clientId string, clientSecret string) (*core.Session, error) {
 	return core.LoginOAuth(deviceName, clientId, clientSecret)

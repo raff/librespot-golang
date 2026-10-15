@@ -62,6 +62,13 @@ type Session struct {
 	// they are persisted in AuthDataBlob so they don't need to be supplied again.
 	clientId     string
 	clientSecret string
+	// searchClientId/searchClientSecret are the credentials of an application used for Web API search
+	// (client credentials flow) when the login itself was done with the official client id (PKCE).
+	searchClientId     string
+	searchClientSecret string
+	// searchAppToken is true when accessToken was obtained with the search client id/secret
+	// (as opposed to the shared official client id)
+	searchAppToken bool
 }
 
 func (s *Session) Stream() connection.PacketStream {
@@ -97,7 +104,15 @@ func (s *Session) ReusableAuthBlob() []byte {
 // should be written to the blob file so future runs can both reconnect and
 // use the Web API (e.g. Search) without an interactive login.
 func (s *Session) AuthDataBlob() []byte {
-	return marshalAuthData(s.reusableAuthBlob, s.refreshToken, s.clientId, s.clientSecret)
+	return marshalAuthData(AuthData{Username: s.username, Blob: s.reusableAuthBlob, RefreshToken: s.refreshToken,
+		ClientID: s.clientId, ClientSecret: s.clientSecret,
+		SearchClientID: s.searchClientId, SearchClientSecret: s.searchClientSecret})
+}
+
+// UsesSearchApp returns true if the Web API token (used by Search) was obtained with the search
+// client id/secret, rather than with the shared official client id (which is heavily rate limited).
+func (s *Session) UsesSearchApp() bool {
+	return s.searchAppToken
 }
 
 // AccessToken returns the current OAuth Web API bearer token, or "" if none
